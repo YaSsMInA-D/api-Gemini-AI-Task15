@@ -1,69 +1,286 @@
-
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Tic Tac Toe - {{ game.room_name }}</title>
+    <title>{{ game.room_name }} - Tic Tac Toe</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 40px; text-align: center; }
-        .board { display: inline-block; margin: 20px; }
-        .board-row { display: flex; }
-        .square { width: 80px; height: 80px; border: 2px solid #333; display: flex; align-items: center; justify-content: center; font-size: 24px; background: white; cursor: pointer; }
-        .square:hover { background: #f0f0f0; }
-        .square:disabled { cursor: not-allowed; background: #f8f8f8; }
-        .btn { padding: 10px 15px; margin: 5px; background: #007bff; color: white; text-decoration: none; border-radius: 4px; display: inline-block; }
-        .btn-danger { background: #dc3545; }
+        body { font-family: Arial, sans-serif; margin: 40px; background: #f5f5f5; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .game-header { margin-bottom: 30px; border-bottom: 2px solid #eee; padding-bottom: 20px; }
+        .board { display: grid; grid-template-columns: repeat(3, 100px); grid-gap: 8px; margin: 30px auto; justify-content: center; }
+        .cell { width: 100px; height: 100px; border: 3px solid #333; display: flex; align-items: center; justify-content: center; 
+                font-size: 2.5em; cursor: pointer; background: white; transition: all 0.3s; }
+        .cell:hover { background: #f0f0f0; transform: scale(1.05); }
+        .cell.disabled { cursor: not-allowed; background: #f8f9fa; opacity: 0.7; }
+        .cell.disabled:hover { background: #f8f9fa; transform: none; }
+        .cell.x { background: #ffebee; }
+        .cell.o { background: #e3f2fd; }
+        .game-info { margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 8px; }
+        .status-active { color: #4CAF50; font-weight: bold; }
+        .status-won { color: #2196F3; font-weight: bold; }
+        .status-tie { color: #FF9800; font-weight: bold; }
+        .btn { padding: 10px 20px; background: #4CAF50; color: white; text-decoration: none; border-radius: 5px; display: inline-block; margin: 5px; border: none; cursor: pointer; }
+        .btn:hover { background: #45a049; }
+        .btn-danger { background: #f44336; }
+        .btn-danger:hover { background: #da190b; }
+        .btn-join { background: #FF9800; }
+        .btn-join:hover { background: #F57C00; }
+        .messages { margin: 20px 0; }
+        .alert { padding: 12px; border-radius: 5px; margin-bottom: 15px; }
+        .alert-success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .alert-error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .player-info { font-size: 1.2em; margin: 15px 0; }
+        #live-updates { background: #e3f2fd; padding: 10px; border-radius: 5px; margin: 10px 0; }
     </style>
 </head>
 <body>
-    <h1>{{ game.room_name }}</h1>
-    <p>Owner: {{ game.owner.username }}</p>
-    <p>Current Player: {{ game.get_active_player_display }}</p>
-    
-    {% if game.game_state == 'active' %}
-        <p>Game in Progress</p>
-    {% elif game.game_state == 'won' %}
-        <p>Player {{ game.winner }} Wins!</p>
-    {% elif game.game_state == 'tie' %}
-        <p>It's a Tie!</p>
-    {% endif %}
-
-    {% if is_owner and game.game_state == 'active' %}
-    <div class="board">
-        {% for row in board %}
-        <div class="board-row">
-            {% for cell in row %}
-            {% with position=forloop.parentloop.counter0|add:forloop.parentloop.counter0|add:forloop.parentloop.counter0|add:forloop.counter0 %}
-            <form method="post" action="{% url 'make_move' game.id %}" style="display: inline;">
-                {% csrf_token %}
-                <input type="hidden" name="position" value="{{ position }}">
-                <button type="submit" class="square" {% if cell != ' ' %}disabled{% endif %}>
-                    {% if cell == 'X' %}❌{% elif cell == 'O' %}⭕{% endif %}
-                </button>
-            </form>
-            {% endwith %}
-            {% endfor %}
-        </div>
-        {% endfor %}
-    </div>
-    {% else %}
-    <div class="board">
-        {% for row in board %}
-        <div class="board-row">
-            {% for cell in row %}
-            <div class="square">
-                {% if cell == 'X' %}❌{% elif cell == 'O' %}⭕{% endif %}
+    <div class="container">
+        <div class="game-header">
+            <h1>🏠 {{ game.room_name }}</h1>
+            <p>👤 Room created by: <strong>{{ game.owner.username }}</strong></p>
+            <p>👋 Current user: <strong>{{ user.username }}</strong></p>
+            
+            <div class="game-info">
+                <p>
+                    📊 Status: <span class="status-{{ game.game_state }}" id="game-status">{{ game.get_game_state_display }}</span>
+                    | 🎯 Current Player: <strong id="current-player">{{ game.get_current_player_display }}</strong>
+                    {% if game.game_state == 'won' %}
+                        | 🏆 Winner: <strong id="winner">{{ game.get_winner_display }}</strong>
+                    {% endif %}
+                </p>
+                <p>
+                    Players: 
+                    <strong>❌ {{ game.owner.username }}</strong>
+                    {% if game.player_o %}
+                        <strong>⭕ {{ game.player_o.username }}</strong>
+                    {% else %}
+                        <span id="player-o-status">⭕ Waiting for player...</span>
+                    {% endif %}
+                </p>
             </div>
+        </div>
+
+        <div class="messages">
+            {% for message in messages %}
+                <div class="alert alert-{% if message.tags == 'error' %}error{% else %}success{% endif %}">
+                    {% if message.tags == 'error' %}❌{% else %}✅{% endif %} {{ message }}
+                </div>
             {% endfor %}
         </div>
-        {% endfor %}
-    </div>
-    {% endif %}
 
-    <div style="margin-top: 20px;">
-        {% if is_owner %}
-        <a href="{% url 'delete_game' game.id %}" class="btn btn-danger">Delete Game</a>
-        {% endif %}
-        <a href="{% url 'game_list' %}" class="btn">Back to Game List</a>
+        <!-- Live Updates from WebSocket -->
+        <div id="live-updates" style="display: none;">
+            <strong>🔄 Live Update:</strong> <span id="update-message"></span>
+        </div>
+
+        <!-- Game Board -->
+        <div class="board" id="game-board">
+            {% for row in board_display %}
+                {% for cell in row %}
+                    {% with position=forloop.parentloop.counter0|add:forloop.counter0|add:forloop.parentloop.counter0|add:forloop.parentloop.counter0 %}
+                    <div class="cell {% if cell == 'X' %}x{% elif cell == 'O' %}o{% else %}empty{% endif %}" 
+                         data-position="{{ position }}"
+                         onclick="makeMove({{ position }})">
+                        {% if cell == 'X' %}❌{% elif cell == 'O' %}⭕{% endif %}
+                    </div>
+                    {% endwith %}
+                {% endfor %}
+            {% endfor %}
+        </div>
+
+        <!-- Player Controls -->
+        <div class="player-info">
+            <div id="player-message">
+                {% if game.game_state == 'active' %}
+                    {% if game.is_player %}
+                        {% if game.player_symbol == game.current_player %}
+                            <p>🎮 <strong>Your turn!</strong> Click on an empty square to place your move.</p>
+                        {% else %}
+                            <p>⏳ <strong>Waiting for opponent...</strong></p>
+                        {% endif %}
+                    {% else %}
+                        {% if not game.player_o %}
+                            <p>👀 <strong>Spectator mode.</strong> You can join as Player O!</p>
+                        {% else %}
+                            <p>👀 <strong>Spectator mode.</strong> Watching the game.</p>
+                        {% endif %}
+                    {% endif %}
+                {% elif game.game_state == 'won' %}
+                    <p>🎉 <strong>Game Over!</strong> <span id="winner-text">{{ game.get_winner_display }}</span> wins! 🏆</p>
+                {% elif game.game_state == 'tie' %}
+                    <p>🤝 <strong>Game Over!</strong> It's a tie!</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div>
+            {% if not game.is_player and not game.player_o and user != game.owner %}
+                <button class="btn btn-join" onclick="joinGame()">🎮 Join as Player O</button>
+            {% endif %}
+            
+            <a href="{% url 'games:game_list' %}" class="btn">← Back to Game List</a>
+            
+            {% if game.owner == user %}
+                <a href="{% url 'games:delete_game' game.id %}" class="btn btn-danger" 
+                   onclick="return confirm('Are you sure you want to delete this game?')">
+                    🗑️ Delete Game
+                </a>
+            {% endif %}
+        </div>
     </div>
+
+    <!-- Pass game data to JavaScript -->
+    {{ game_data|json_script:"game-data" }}
+    
+    <script>
+        // Get game data from Django template
+        const gameData = JSON.parse(document.getElementById('game-data').textContent);
+        const userId = {{ user.id }};
+        const userName = "{{ user.username }}";
+        
+        // WebSocket connection
+        const gameSocket = new WebSocket(
+            'ws://' + window.location.host + '/ws/game/' + gameData.id + '/'
+        );
+
+        gameSocket.onopen = function(e) {
+            console.log('WebSocket connection established');
+            showLiveUpdate('Connected to game');
+        };
+
+        gameSocket.onmessage = function(e) {
+            const data = JSON.parse(e.data);
+            console.log('WebSocket message received:', data);
+            
+            if (data.type === 'game_update') {
+                updateGameState(data.game_data);
+                if (data.message) {
+                    showLiveUpdate(data.message);
+                }
+            } else if (data.type === 'game_state') {
+                updateGameState(data.game_data);
+            } else if (data.type === 'error') {
+                showLiveUpdate('Error: ' + data.message);
+            }
+        };
+
+        gameSocket.onclose = function(e) {
+            console.log('WebSocket connection closed');
+            showLiveUpdate('Connection lost - refreshing...');
+            setTimeout(() => {
+                location.reload();
+            }, 3000);
+        };
+
+        function updateGameState(gameData) {
+            // Update game status
+            document.getElementById('game-status').textContent = 
+                gameData.game_state.charAt(0).toUpperCase() + gameData.game_state.slice(1);
+            document.getElementById('game-status').className = 'status-' + gameData.game_state;
+            
+            // Update current player
+            const currentPlayerDisplay = gameData.current_player === 'X' ? 'Player X (❌)' : 'Player O (⭕)';
+            document.getElementById('current-player').textContent = currentPlayerDisplay;
+            
+            // Update winner if exists
+            if (gameData.winner) {
+                const winnerDisplay = gameData.winner === 'X' ? 'Player X (❌)' : 'Player O (⭕)';
+                document.getElementById('winner').textContent = winnerDisplay;
+                document.getElementById('winner-text').textContent = winnerDisplay;
+            }
+            
+            // Update player O status
+            const playerOStatus = document.getElementById('player-o-status');
+            if (playerOStatus && gameData.player_o) {
+                playerOStatus.innerHTML = `<strong>⭕ ${gameData.player_o}</strong>`;
+            }
+            
+            // Update board
+            updateBoard(gameData.board);
+            
+            // Update player message
+            updatePlayerMessage(gameData);
+        }
+
+        function updateBoard(boardString) {
+            const cells = document.querySelectorAll('.cell');
+            for (let i = 0; i < 9; i++) {
+                const cell = cells[i];
+                const symbol = boardString[i];
+                
+                cell.className = 'cell';
+                if (symbol === 'X') {
+                    cell.className += ' x';
+                    cell.innerHTML = '❌';
+                } else if (symbol === 'O') {
+                    cell.className += ' o';
+                    cell.innerHTML = '⭕';
+                } else {
+                    cell.className += ' empty';
+                    cell.innerHTML = '';
+                }
+            }
+        }
+
+        function updatePlayerMessage(gameData) {
+            const playerMessage = document.getElementById('player-message');
+            const userSymbol = (userId === gameData.owner_id) ? 'X' : 
+                              (userId === gameData.player_o_id) ? 'O' : null;
+            
+            let message = '';
+            if (gameData.game_state === 'active') {
+                if (userSymbol) {
+                    if (userSymbol === gameData.current_player) {
+                        message = '<p>🎮 <strong>Your turn!</strong> Click on an empty square to place your move.</p>';
+                    } else {
+                        message = '<p>⏳ <strong>Waiting for opponent...</strong></p>';
+                    }
+                } else {
+                    if (!gameData.player_o) {
+                        message = '<p>👀 <strong>Spectator mode.</strong> You can join as Player O!</p>';
+                    } else {
+                        message = '<p>👀 <strong>Spectator mode.</strong> Watching the game.</p>';
+                    }
+                }
+            } else if (gameData.game_state === 'won') {
+                message = `<p>🎉 <strong>Game Over!</strong> ${gameData.winner === 'X' ? 'Player X (❌)' : 'Player O (⭕)'} wins! 🏆</p>`;
+            } else if (gameData.game_state === 'tie') {
+                message = '<p>🤝 <strong>Game Over!</strong> It\'s a tie!</p>';
+            }
+            
+            playerMessage.innerHTML = message;
+        }
+
+        function makeMove(position) {
+            // Check if it's the user's turn and the cell is empty
+            const cell = document.querySelector(`.cell[data-position="${position}"]`);
+            if (cell.classList.contains('empty') && gameData.game_state === 'active') {
+                gameSocket.send(JSON.stringify({
+                    'type': 'make_move',
+                    'position': position,
+                    'user_id': userId
+                }));
+            }
+        }
+
+        function joinGame() {
+            gameSocket.send(JSON.stringify({
+                'type': 'join_game',
+                'user_id': userId
+            }));
+        }
+
+        function showLiveUpdate(message) {
+            const liveUpdate = document.getElementById('live-updates');
+            const updateMessage = document.getElementById('update-message');
+            
+            updateMessage.textContent = message;
+            liveUpdate.style.display = 'block';
+            
+            setTimeout(() => {
+                liveUpdate.style.display = 'none';
+            }, 5000);
+        }
+    </script>
 </body>
 </html>
