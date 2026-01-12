@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     'theme',
     'rest_framework',
     'api',
+    'external_api',  
     'django_browser_reload',
     
 ]

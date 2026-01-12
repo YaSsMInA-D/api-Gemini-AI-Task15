@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Task 14 - External API Demo</title>
+</head>
+<body>
+    <h1>External API Data - Task 14</h1>
+    <p>Showing data from: https://jsonplaceholder.typicode.com/posts</p>
+    
+    {% for post in posts %}
+        <div style="border:1px solid #ccc; padding:10px; margin:10px;">
+            <h3>{{ post.title }}</h3>
+            <p><strong>ID:</strong> {{ post.id }}</p>
+            <p><strong>User ID:</strong> {{ post.userId }}</p>
+            <p>{{ post.body|truncatechars:100 }}</p>
+        </div>
+    {% endfor %}
+    
+    <p><small>This demonstrates Task 14: Using external APIs in Django</small></p>
+</body>
+</html>
