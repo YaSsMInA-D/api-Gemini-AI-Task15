@@ -9,6 +9,7 @@ urlpatterns = [
     path('games/', include('games.urls')),
     path('task14-api/', include('external_api.urls')),  
     path('api/', include('api.urls')),  
+    path('chatbot/', include('chatbot.urls')),
     path('', include('djangoapp.urls')),  
     path('users/', include('users.urls')),
     path('accounts/login/', auth_views.LoginView.as_view(template_name='users/login.html'), name='login'),
